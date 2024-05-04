@@ -2,15 +2,20 @@ const express = require('express');
 require('dotenv').config()
 const cors  = require('cors');
 const jwt = require('jsonwebtoken');
-
+const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion,ObjectId } = require('mongodb');
 const app= express();
 const port = process.env.PORT||5000;
 
 
 //middleware
-app.use(cors());
+app.use(cors({
+  origin:['http://localhost:5173'],
+  credentials:true
+}));
+
 app.use(express.json());
+app.use(cookieParser());
 
 
 console.log(process.env.DB_USER)
@@ -25,6 +30,11 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
+// middlewares nijosso
+const logger = async(req,res,next)=>{
+  console.log('called', req.host, req.originalUrl)
+  next();
+}
 
 async function run() {
   try {
@@ -35,37 +45,37 @@ async function run() {
    const bookingCollection = client.db('carDoctor').collection('bookings');
   
   // auth related api
-  // app.post('/jwt',async(req,res)=>{
-  //   const user = req.body;
-  //   console.log(user)
-  //   const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn:'1h'})
-  //   res
-  //   .cookie('token',token,{
-  //     httpOnly:true,
-  //     secure:false,//http://localhost:5173/login.  true hobe https takle
-  //     sameSite:'none'
-  //   })
-  //   .send({success:true});
-  // })
-   app.post('/jwt',async(req,res)=>{
+  app.post('/jwt',logger,async(req,res)=>{
     const user = req.body;
-    const token = jwt.sign({
-      user,
-    }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+    console.log(user)
+    const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn:'1h'})
     res
     .cookie('token',token,{
       httpOnly:true,
-      secure:false,
-      sameSite:'none'
+      secure:false,//http://localhost:5173/login.  true hobe https takle
+      sameSite:'strict'
     })
-    .send({success:true})
+    .send({success:true});
+  })
+  //  app.post('/jwt',async(req,res)=>{
+  //   const user = req.body;
+  //   const token = jwt.sign({
+  //     user,
+  //   }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+  //   res
+  //   .cookie('token',token,{
+  //     httpOnly:true,
+  //     secure:false,
+  //     sameSite:'none'
+  //   })
+  //   .send({success:true})
 
-   })
+  //  })
 
   
   //  services related api
   //  find multiple data
-   app.get('/services',async(req,res)=>{
+   app.get('/services',logger,async(req,res)=>{
     const cursor = serviceCollection.find();
     const result = await cursor.toArray();
     res.send(result);
@@ -88,14 +98,16 @@ async function run() {
      
   })
     //  bookings
-    app.post('/bookings',async(req,res)=>{
+    app.post('/bookings',logger,async(req,res)=>{
       const booking = req.body;
+     
       const result = await bookingCollection.insertOne(booking);
       res.send(result)
       console.log(booking);
     })
     app.get('/bookings',async(req,res)=>{
-      console.log(req.query.email)
+      console.log(req.query.email);
+       console.log('tok tok token',req.cookies.token)
 
       let query = {};
       if(req.query?.email){
